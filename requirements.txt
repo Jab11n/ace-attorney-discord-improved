@@ -1,4 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 discord.py
 emoji
 pyyaml
 objection_engine
+torch
+torchvision
+torchaudio
