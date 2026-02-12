@@ -10,4 +10,11 @@ db.json
 # Ignore the assets
 assets/
 
+# ignore the config
 config.yaml
+
+# ignore the venv
+.venv/
+
+# ignore .vscode
+.vscode/
