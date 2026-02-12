@@ -21,6 +21,8 @@ uv venv --python 3.10
 source .venv/bin/activate
 ```
 Install dependencies from the `requirements.txt`.
+> [!NOTE]
+> The `requirements.txt` and `Pipfile` call for the CPU-only version of torch by default. If you have a discrete graphics card and want to use the GPU for rendering, edit them to require the latest default version of torch.
 ```bash
 uv pip install -r requirements.txt
 ```
