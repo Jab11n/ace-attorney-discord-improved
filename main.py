@@ -12,6 +12,7 @@ sys.path.append("./objection_engine")
 
 from deletion import Deletion
 from discord.ext import commands, tasks
+from discord import app_commands
 from message import Message
 from objection_engine.beans.comment import Comment
 from objection_engine.renderer import render_comment_list
@@ -23,6 +24,7 @@ from typing import List
 renderQueue = []
 deletionQueue = []
 lastRender = 0
+treeSynced = False
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -96,6 +98,142 @@ def addToDeletionQueue(message: discord.Message):
     if int(deletionDelay) > 0:
         newDeletion = Deletion(message, int(deletionDelay))
         deletionQueue.append(newDeletion)
+
+class InteractionContextAdapter:
+    def __init__(self, interaction: discord.Interaction, message: discord.Message):
+        self.author = interaction.user
+        self.guild = interaction.guild
+        self.channel = interaction.channel
+        self.message = message
+
+    async def send(self, *args, **kwargs):
+        return await self.channel.send(*args, **kwargs)
+
+class RenderCountModal(discord.ui.Modal):
+    def __init__(self, title: str, on_submit_handler):
+        super().__init__(title=title)
+        self.on_submit_handler = on_submit_handler
+        self.count = discord.ui.TextInput(
+            label="Number of messages",
+            placeholder="1-100",
+            required=True
+        )
+        self.add_item(self.count)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            number_of_messages = int(self.count.value)
+        except ValueError:
+            await interaction.response.send_message(
+                "Please enter a whole number between 1 and 100.",
+                ephemeral=True
+            )
+            return
+
+        if number_of_messages < 1 or number_of_messages > 100:
+            await interaction.response.send_message(
+                "Number of messages must be between 1 and 100.",
+                ephemeral=True
+            )
+            return
+
+        await self.on_submit_handler(interaction, number_of_messages)
+
+async def collect_court_messages(
+    base_message: discord.Message,
+    number_of_messages: int,
+    direction: str,
+    include_base: bool
+):
+    discord_messages: List[discord.Message] = []
+    fetch_count = number_of_messages
+    if include_base:
+        discord_messages.append(base_message)
+        fetch_count = number_of_messages - 1
+
+    if fetch_count > 0:
+        if direction == "end":
+            fetched = [
+                message async for message in base_message.channel.history(
+                    limit=fetch_count,
+                    oldest_first=True,
+                    before=base_message
+                )
+            ]
+            discord_messages = fetched + discord_messages
+        else:
+            fetched = [
+                message async for message in base_message.channel.history(
+                    limit=fetch_count,
+                    oldest_first=True,
+                    after=base_message
+                )
+            ]
+            discord_messages = discord_messages + fetched
+
+    court_messages: List[Comment] = []
+    for discordMessage in discord_messages:
+        message = Message(discordMessage)
+        if message.text.strip():
+            court_messages.append(message.to_Comment())
+
+    return court_messages
+
+async def enqueue_render(
+    context_like,
+    feedback_sender,
+    base_message: discord.Message,
+    number_of_messages: int,
+    direction: str,
+    include_base: bool,
+    music: str,
+    feedback_message: discord.Message = None
+):
+    feedbackMessage = feedback_message
+    if feedbackMessage is None:
+        feedbackMessage = await feedback_sender.send(content="<a:loading:1471333352798945372> **Checking queue...**")
+
+    global lastRender, cooldown
+    if lastRender is not None and cooldown is not None:
+        if (time.time() - lastRender) < cooldown:
+            errEmbed = discord.Embed(
+                description=f"Please wait **{round(cooldown - (time.time() - lastRender))}** seconds before using this command again.",
+                color=0xff0000
+            )
+            await feedbackMessage.edit(content="", embed=errEmbed)
+            addToDeletionQueue(feedbackMessage)
+            return
+
+    global renderQueue
+    petitionsFromSameGuild = [x for x in renderQueue if x.discordContext.guild.id == context_like.guild.id]
+    petitionsFromSameUser = [x for x in renderQueue if x.discordContext.author.id == context_like.author.id]
+
+    try:
+        if len(petitionsFromSameGuild) > max_per_guild:
+            raise Exception(f"Only up to {max_per_guild} renders per guild are allowed")
+        if len(petitionsFromSameUser) > max_per_user:
+            raise Exception(f"Only up to {max_per_user} renders per user are allowed")
+
+        await feedbackMessage.edit(content="<a:loading:1471333352798945372> **Fetching messages...**")
+
+        courtMessages = await collect_court_messages(
+            base_message,
+            number_of_messages,
+            direction,
+            include_base
+        )
+
+        if len(courtMessages) < 1:
+            raise Exception("There should be at least one person in the conversation.")
+
+        newRender = Render(State.QUEUED, context_like, feedbackMessage, courtMessages, music)
+        renderQueue.append(newRender)
+        lastRender = time.time()
+
+    except Exception as exception:
+        exceptionEmbed = discord.Embed(description=str(exception), color=0xff0000)
+        await feedbackMessage.edit(content="", embed=exceptionEmbed)
+        addToDeletionQueue(feedbackMessage)
 
 @courtBot.event
 async def on_message(message):
@@ -185,24 +323,7 @@ async def render(context, numberOfMessages: int = 0, music: str = 'pwr'):
             addToDeletionQueue(errMsg)
             return
             
-    global lastRender, cooldown
-    if lastRender is not None and cooldown is not None:
-        if (time.time() - lastRender) < cooldown:
-            errEmbed = discord.Embed(description=f"Please wait **{round(cooldown - (time.time() - lastRender))}** seconds before using this command again.", color=0xff0000)
-            errMsg = await context.send(embed=errEmbed)
-            addToDeletionQueue(errMsg)
-            return
-
-    global renderQueue
-    feedbackMessage = await context.send(content="<a:loading:1471333352798945372> **Checking queue...**")
-    petitionsFromSameGuild = [x for x in renderQueue if x.discordContext.guild.id == context.guild.id]
-    petitionsFromSameUser = [x for x in renderQueue if x.discordContext.author.id == context.author.id]
     try:
-        if (len(petitionsFromSameGuild) > max_per_guild):
-            raise Exception(f"Only up to {max_per_guild} renders per guild are allowed")
-        if (len(petitionsFromSameUser) > max_per_user):
-            raise Exception(f"Only up to {max_per_user} renders per user are allowed")
-        await feedbackMessage.edit(content="<a:loading:1471333352798945372> **Fetching messages...**")
         if numberOfMessages == 0:
             raise Exception("Please specify the number of messages to be rendered!")
         if not (numberOfMessages in range(1, 101)):
@@ -210,37 +331,78 @@ async def render(context, numberOfMessages: int = 0, music: str = 'pwr'):
 
         # baseMessage is the message from which the specified number of messages will be fetch, not including itself
         baseMessage = context.message.reference.resolved if context.message.reference else context.message
-        courtMessages = []
-        discordMessages = []
-
-        # If the render command was executed within a reply (baseMessage and context.Message aren't the same), we want
-        # to append the message the user replied to (baseMessage) to the 'discordMessages' list and substract 1 from
-        # 'numberOfMessages' that way we are taking the added baseMessage into consideration and avoid getting 1 extra message)
-        if not baseMessage.id == context.message.id:
-            numberOfMessages = numberOfMessages - 1
-            discordMessages.append(baseMessage)
-
-        # This will append all messages to the already existing discordMessages, if the message was a reply it should already
-        # include one message (the one it was replying to), if not: it will be empty at this point.
-        discordMessages += [message async for message in context.channel.history(limit=numberOfMessages, oldest_first=False, before=baseMessage)]
-        
-        for discordMessage in discordMessages:
-            message = Message(discordMessage)
-            if message.text.strip():
-                courtMessages.insert(0, message.to_Comment())
-
-        if len(courtMessages) < 1:
-            raise Exception("There should be at least one person in the conversation.")
-
-        newRender = Render(State.QUEUED, context, feedbackMessage, courtMessages, music)
-        renderQueue.append(newRender)
-
-        lastRender = time.time()
-
+        include_base = baseMessage.id != context.message.id
+        await enqueue_render(
+            context,
+            context,
+            baseMessage,
+            numberOfMessages,
+            "end",
+            include_base,
+            music
+        )
     except Exception as exception:
         exceptionEmbed = discord.Embed(description=str(exception), color=0xff0000)
-        await feedbackMessage.edit(content="", embed=exceptionEmbed)
-        addToDeletionQueue(feedbackMessage)
+        errMsg = await context.send(embed=exceptionEmbed)
+        addToDeletionQueue(errMsg)
+
+@courtBot.tree.context_menu(name="render, start with this message")
+async def render_from_start(interaction: discord.Interaction, message: discord.Message):
+    if staff_only:
+        if not interaction.user.guild_permissions.manage_messages:
+            errEmbed = discord.Embed(description="Only staff members can use this command!", color=0xff0000)
+            await interaction.response.send_message(embed=errEmbed, ephemeral=True)
+            return
+
+    async def handle_submit(modal_interaction: discord.Interaction, number_of_messages: int):
+        await modal_interaction.response.send_message(
+            "<a:loading:1471333352798945372> **Checking queue...**"
+        )
+        feedbackMessage = await modal_interaction.original_response()
+        context_adapter = InteractionContextAdapter(modal_interaction, message)
+        await enqueue_render(
+            context_adapter,
+            modal_interaction.channel,
+            message,
+            number_of_messages,
+            "start",
+            True,
+            "pwr",
+            feedback_message=feedbackMessage
+        )
+
+    await interaction.response.send_modal(
+        RenderCountModal("Render: start with this message", handle_submit)
+    )
+
+@courtBot.tree.context_menu(name="render, end with this message")
+async def render_from_end(interaction: discord.Interaction, message: discord.Message):
+    if staff_only:
+        if not interaction.user.guild_permissions.manage_messages:
+            errEmbed = discord.Embed(description="Only staff members can use this command!", color=0xff0000)
+            await interaction.response.send_message(embed=errEmbed, ephemeral=True)
+            return
+
+    async def handle_submit(modal_interaction: discord.Interaction, number_of_messages: int):
+        await modal_interaction.response.send_message(
+            "<a:loading:1471333352798945372> **Checking queue...**"
+        )
+        feedbackMessage = await modal_interaction.original_response()
+        context_adapter = InteractionContextAdapter(modal_interaction, message)
+        await enqueue_render(
+            context_adapter,
+            modal_interaction.channel,
+            message,
+            number_of_messages,
+            "end",
+            True,
+            "pwr",
+            feedback_message=feedbackMessage
+        )
+
+    await interaction.response.send_modal(
+        RenderCountModal("Render: end with this message", handle_submit)
+    )
 
 @tasks.loop(minutes=5)
 async def garbageCollection():
@@ -322,10 +484,13 @@ async def renderQueueLoop():
 
 @courtBot.event
 async def on_ready():
-    global currentActivityText
+    global currentActivityText, treeSynced
     print("Bot is ready!")
     print(f"Logged in as {courtBot.user.name}#{courtBot.user.discriminator} ({courtBot.user.id})")
     currentActivityText = f"{prefix}help"
+    if not treeSynced:
+        await courtBot.tree.sync()
+        treeSynced = True
     renderQueueLoop.start()
     deletionQueueLoop.start()
 
