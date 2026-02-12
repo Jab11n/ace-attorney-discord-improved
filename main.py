@@ -7,6 +7,7 @@ import threading
 import time
 import yaml
 import gc
+import torch
 sys.path.append("./objection_engine")
 
 from deletion import Deletion
@@ -24,7 +25,10 @@ deletionQueue = []
 lastRender = 0
 
 intents = discord.Intents.default()
+intents.guilds = True
 intents.members = True
+intents.messages = True
+intents.message_content = True
 def loadConfig():
     try:
         with open("config.yaml") as file:
@@ -69,7 +73,7 @@ def loadConfig():
 if not loadConfig():
     exit()
 
-courtBot = commands.AutoShardedBot(command_prefix=prefix, Intents=intents, max_messages=None)
+courtBot = commands.AutoShardedBot(command_prefix=prefix, intents=intents, max_messages=None)
 # Default 'help' command is removed, we will make our own
 courtBot.remove_command("help")
 currentActivityText = f"{prefix}help"
@@ -137,8 +141,9 @@ async def help(context):
             return
 
     dummyAmount = random.randint(2, 150)
-    helpEmbed = discord.Embed(description="Discord bot that turns message chains into ace attorney scenes.\nIf you have any problems, please go to [the support server](https://discord.gg/pcS4MPbRDU).", color=0x3366CC, footer="Do not include these symbols (\"<\" and \">\") when using this command")
-    helpEmbed.set_author(name=courtBot.user.name, icon_url=courtBot.user.avatar_url)
+    helpEmbed = discord.Embed(description="Discord bot that turns message chains into ace attorney scenes.\nIf you have any problems, please go to [the support server](https://discord.gg/pcS4MPbRDU).", color=0x3366CC)
+    helpEmbed.set_footer(text="Do not include these symbols (\"<\" and \">\") when using this command")
+    helpEmbed.set_author(name=courtBot.user.name, icon_url=courtBot.user.display_avatar.url)
     helpEmbed.add_field(name="How to use?", value=f"`{prefix}render <number_of_messages> <music (optional)>`", inline=False)
     helpEmbed.add_field(name="Example", value=f"Turn the last {dummyAmount} messages into an ace attorney scene: `{prefix}render {dummyAmount}`", inline=False)
     helpEmbed.add_field(name="Example with music", value=f"`{prefix}render {dummyAmount} tat`", inline=False)
@@ -217,7 +222,7 @@ async def render(context, numberOfMessages: int = 0, music: str = 'pwr'):
 
         # This will append all messages to the already existing discordMessages, if the message was a reply it should already
         # include one message (the one it was replying to), if not: it will be empty at this point.
-        discordMessages += await context.channel.history(limit=numberOfMessages, oldest_first=False, before=baseMessage).flatten()
+        discordMessages += [message async for message in context.channel.history(limit=numberOfMessages, oldest_first=False, before=baseMessage)]
         
         for discordMessage in discordMessages:
             message = Message(discordMessage)
