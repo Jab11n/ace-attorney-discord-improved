@@ -13,9 +13,9 @@ name = "pytorch-cpu"
 emoji = "*"
 pyyaml = "*"
 objection-engine = "*"
-torch = {version = "*", index = "pytorch-cpu"}
-torchvision = {version = "*", index = "pytorch-cpu"}
-torchaudio = {version = "*", index = "pytorch-cpu"}
+torch = {version = ">=2.1.0", index = "pytorch-cpu"}
+torchvision = {version = ">=0.16.0", index = "pytorch-cpu"}
+torchaudio = {version = ">=2.1.0", index = "pytorch-cpu"}
 
 [dev-packages]
 
