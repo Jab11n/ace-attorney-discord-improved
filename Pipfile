@@ -12,6 +12,7 @@ name = "pytorch-cpu"
 "discord.py" = "*"
 emoji = "*"
 pyyaml = "*"
+pillow = ">=10.3.0"
 objection-engine = "*"
 torch = {version = ">=2.1.0", index = "pytorch-cpu"}
 torchvision = {version = ">=0.16.0", index = "pytorch-cpu"}
