@@ -194,7 +194,7 @@ async def render(context, numberOfMessages: int = 0, music: str = 'pwr'):
             return
 
     global renderQueue
-    feedbackMessage = await context.send(content="`Checking queue...`")
+    feedbackMessage = await context.send(content="<a:loading:1471333352798945372> **Checking queue...**")
     petitionsFromSameGuild = [x for x in renderQueue if x.discordContext.guild.id == context.guild.id]
     petitionsFromSameUser = [x for x in renderQueue if x.discordContext.author.id == context.author.id]
     try:
@@ -202,7 +202,7 @@ async def render(context, numberOfMessages: int = 0, music: str = 'pwr'):
             raise Exception(f"Only up to {max_per_guild} renders per guild are allowed")
         if (len(petitionsFromSameUser) > max_per_user):
             raise Exception(f"Only up to {max_per_user} renders per user are allowed")
-        await feedbackMessage.edit(content="`Fetching messages...`")
+        await feedbackMessage.edit(content="<a:loading:1471333352798945372> **Fetching messages...**")
         if numberOfMessages == 0:
             raise Exception("Please specify the number of messages to be rendered!")
         if not (numberOfMessages in range(1, 101)):
@@ -266,31 +266,31 @@ async def renderQueueLoop():
         try:
             if render.getState() == State.QUEUED:
                 newFeedback = f"""
-                `Fetching messages... Done!`
-                `Position in the queue: #{(positionInQueue)}`
+                Fetching messages... Done!
+                <a:loading:1471333352798945372> **Position in the queue: #{(positionInQueue)}**
                 """
                 await render.updateFeedback(newFeedback)
 
             if render.getState() == State.INPROGRESS:
                 newFeedback = f"""
-                `Fetching messages... Done!`
-                `Your video is being generated...`
+                Fetching messages... Done!
+                <a:loading:1471333352798945372> **Your video is being generated...**
                 """
                 await render.updateFeedback(newFeedback)
 
             if render.getState() == State.FAILED:
                 newFeedback = f"""
-                `Fetching messages... Done!`
-                `Your video is being generated... Failed!`
+                Fetching messages... Done!
+                :x: **Your video is being generated... Failed!**
                 """
                 await render.updateFeedback(newFeedback)
                 render.setState(State.DONE)
 
             if render.getState() == State.RENDERED:
                 newFeedback = f"""
-                `Fetching messages... Done!`
-                `Your video is being generated... Done!`
-                `Uploading file to Discord...`
+                Fetching messages... Done!
+                Your video is being generated... Done!
+                <a:loading:1471333352798945372> **Uploading file to Discord...**
                 """
                 await render.updateFeedback(newFeedback)
 
@@ -298,9 +298,9 @@ async def renderQueueLoop():
                 await render.getContext().send(content=render.getContext().author.mention, file=discord.File(render.getOutputFilename()))
                 render.setState(State.DONE)
                 newFeedback = f"""
-                `Fetching messages... Done!`
-                `Your video is being generated... Done!`
-                `Uploading file to Discord... Done!`
+                Fetching messages... Done!
+                Your video is being generated... Done!
+                :white_check_mark: **Uploading file to Discord... Done!**
                 """
                 await render.updateFeedback(newFeedback)
         except Exception as exception:
