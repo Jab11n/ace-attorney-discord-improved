@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ace-attorney-discord-improved"
+version = "0.1.0"
+description = "A Discord bot that turns conversations into Ace Attorney scenes, with extra features and improvements"
+requires-python = ">=3.10"
+dependencies = [
+    "discord.py",
+    "emoji",
+    "pyyaml",
+    "objection-engine",
+    "setuptools<81",
+    "torch>=2.1.0; python_version < '3.13'",
+    "torchvision>=0.16.0; python_version < '3.13'",
+    "torchaudio>=2.1.0; python_version < '3.13'",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
+
+[tool.setuptools]
+py-modules = []
