@@ -26,6 +26,11 @@ deletionQueue = []
 lastRender = 0
 treeSynced = False
 
+# emojis to use
+e_loading = ":arrows_counterclockwise:"
+e_err = ":x:"
+e_success = ":white_check_mark:"
+
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
@@ -191,7 +196,7 @@ async def enqueue_render(
 ):
     feedbackMessage = feedback_message
     if feedbackMessage is None:
-        feedbackMessage = await feedback_sender.send(content="<a:loading:1471333352798945372> **Checking queue...**")
+        feedbackMessage = await feedback_sender.send(content=f"{e_loading} **Checking queue...**")
 
     global lastRender, cooldown
     if lastRender is not None and cooldown is not None:
@@ -214,7 +219,7 @@ async def enqueue_render(
         if len(petitionsFromSameUser) > max_per_user:
             raise Exception(f"Only up to {max_per_user} renders per user are allowed")
 
-        await feedbackMessage.edit(content="<a:loading:1471333352798945372> **Fetching messages...**")
+        await feedbackMessage.edit(content=f"{e_loading} **Fetching messages...**")
 
         courtMessages = await collect_court_messages(
             base_message,
@@ -356,7 +361,7 @@ async def render_from_start(interaction: discord.Interaction, message: discord.M
 
     async def handle_submit(modal_interaction: discord.Interaction, number_of_messages: int):
         await modal_interaction.response.send_message(
-            "<a:loading:1471333352798945372> **Checking queue...**"
+            f"{e_loading} **Checking queue...**"
         )
         feedbackMessage = await modal_interaction.original_response()
         context_adapter = InteractionContextAdapter(modal_interaction, message)
@@ -385,7 +390,7 @@ async def render_from_end(interaction: discord.Interaction, message: discord.Mes
 
     async def handle_submit(modal_interaction: discord.Interaction, number_of_messages: int):
         await modal_interaction.response.send_message(
-            "<a:loading:1471333352798945372> **Checking queue...**"
+            f"{e_loading} **Checking queue...**"
         )
         feedbackMessage = await modal_interaction.original_response()
         context_adapter = InteractionContextAdapter(modal_interaction, message)
@@ -429,21 +434,21 @@ async def renderQueueLoop():
             if render.getState() == State.QUEUED:
                 newFeedback = f"""
                 Fetching messages... Done!
-                <a:loading:1471333352798945372> **Position in the queue: #{(positionInQueue)}**
+                {e_loading} **Position in the queue: #{(positionInQueue)}**
                 """
                 await render.updateFeedback(newFeedback)
 
             if render.getState() == State.INPROGRESS:
                 newFeedback = f"""
                 Fetching messages... Done!
-                <a:loading:1471333352798945372> **Your video is being generated...**
+                {e_loading} **Your video is being generated...**
                 """
                 await render.updateFeedback(newFeedback)
 
             if render.getState() == State.FAILED:
                 newFeedback = f"""
                 Fetching messages... Done!
-                :x: **Your video is being generated... Failed!**
+                {e_err} **Your video is being generated... Failed!**
                 """
                 await render.updateFeedback(newFeedback)
                 render.setState(State.DONE)
@@ -452,7 +457,7 @@ async def renderQueueLoop():
                 newFeedback = f"""
                 Fetching messages... Done!
                 Your video is being generated... Done!
-                <a:loading:1471333352798945372> **Uploading file to Discord...**
+                {e_loading} **Uploading file to Discord...**
                 """
                 await render.updateFeedback(newFeedback)
 
@@ -462,7 +467,7 @@ async def renderQueueLoop():
                 newFeedback = f"""
                 Fetching messages... Done!
                 Your video is being generated... Done!
-                :white_check_mark: **Uploading file to Discord... Done!**
+                {e_success} **Uploading file to Discord... Done!**
                 """
                 await render.updateFeedback(newFeedback)
         except Exception as exception:
