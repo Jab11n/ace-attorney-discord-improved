@@ -20,11 +20,11 @@ Create the virtual environment and enter it.
 uv venv --python 3.10
 source .venv/bin/activate
 ```
-Install dependencies from the `requirements.txt`.
+Install dependencies and set up the project.
 > [!NOTE]
-> The `requirements.txt` and `Pipfile` call for the CPU-only version of torch by default. If you have a discrete graphics card and want to use the GPU for rendering, edit them to require the latest default version of torch.
+> The `pyproject.toml` calls for the CPU-only version of torch by default. If you have a discrete graphics card and want to use the GPU for rendering, edit it to require the latest default version of torch.
 ```bash
-uv pip install -r requirements.txt
+uv sync
 ```
 Create a copy of `config.yaml.example`, name it `config.yaml`, enter your Discord bot token, and change settings as needed.
 Then, run the bot.
