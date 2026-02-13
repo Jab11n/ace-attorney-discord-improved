@@ -148,7 +148,8 @@ async def collect_court_messages(
     base_message: discord.Message,
     number_of_messages: int,
     direction: str,
-    include_base: bool
+    include_base: bool,
+    feedbackMessageID: int | None
 ):
     discord_messages: List[discord.Message] = []
     fetch_count = number_of_messages
@@ -178,6 +179,8 @@ async def collect_court_messages(
 
     court_messages: List[Comment] = []
     for discordMessage in discord_messages:
+        if feedbackMessageID is not None and discordMessage.id == feedbackMessageID:
+            continue
         message = Message(discordMessage)
         if message.text.strip():
             court_messages.append(message.to_Comment())
@@ -225,7 +228,8 @@ async def enqueue_render(
             base_message,
             number_of_messages,
             direction,
-            include_base
+            include_base,
+            feedbackMessage.id
         )
 
         if len(courtMessages) < 1:
@@ -383,7 +387,7 @@ async def render_from_start(interaction: discord.Interaction, message: discord.M
 @courtBot.tree.context_menu(name="render, end with this message")
 async def render_from_end(interaction: discord.Interaction, message: discord.Message):
     if staff_only:
-        if not interaction.user.guild_permissions.manage_messages:
+        if not interaction.user.guild.permissions.manage_messages:
             errEmbed = discord.Embed(description="Only staff members can use this command!", color=0xff0000)
             await interaction.response.send_message(embed=errEmbed, ephemeral=True)
             return
