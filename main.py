@@ -156,11 +156,11 @@ async def collect_court_messages(
             fetched = [
                 message async for message in base_message.channel.history(
                     limit=fetch_count,
-                    oldest_first=True,
+                    oldest_first=False,
                     before=base_message
                 )
             ]
-            discord_messages = fetched + discord_messages
+            discord_messages = list(reversed(fetched)) + discord_messages
         else:
             fetched = [
                 message async for message in base_message.channel.history(
